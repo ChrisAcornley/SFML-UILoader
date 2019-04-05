@@ -3,6 +3,7 @@
 #include <fstream>
 #include <rapidjson/filereadstream.h>
 #include <rapidjson/document.h>
+#include <TGUI/TGUI.hpp>
 
 std::string userSelectFile()
 {
@@ -43,8 +44,8 @@ std::string userSelectFile()
 
 int main()
 {
-	std::string userChosenFile;
-	bool foundFile = false;
+	std::string userChosenFile = userSelectFile();
+	/*bool foundFile = false;
 	do
 	{
 		userChosenFile = userSelectFile();
@@ -72,10 +73,12 @@ int main()
 			}
 		}
 	} while (!foundFile);
-
+*/
 	
 
-	sf::RenderWindow window(sf::VideoMode(200, 200), "SFML Works!");
+	sf::RenderWindow window(sf::VideoMode(800, 600), "SFML Works!");
+	tgui::Gui gui(window);
+	gui.loadWidgetsFromFile(userChosenFile);
 	sf::CircleShape circle(100.f);
 	circle.setFillColor(sf::Color::Green);
 
@@ -84,6 +87,7 @@ int main()
 		sf::Event event;
 		while (window.pollEvent(event))
 		{
+			gui.handleEvent(event);
 			if (event.type == sf::Event::Closed)
 			{
 				window.close();
@@ -92,6 +96,7 @@ int main()
 
 		window.clear();
 		window.draw(circle);
+		gui.draw();
 		window.display();
 	}
 }
