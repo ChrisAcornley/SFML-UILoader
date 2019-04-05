@@ -79,8 +79,16 @@ int main()
 	sf::RenderWindow window(sf::VideoMode(800, 600), "SFML Works!");
 	tgui::Gui gui(window);
 	gui.loadWidgetsFromFile(userChosenFile);
-	sf::CircleShape circle(100.f);
-	circle.setFillColor(sf::Color::Green);
+
+	tgui::Button::Ptr button = gui.get<tgui::Button>("Button1");
+	
+	button->connect("pressed", [&]()->void {
+		static float xPos = 0.f;
+		tgui::Button::Ptr newButton = tgui::Button::create("Custom Button");
+		newButton->setPosition(sf::Vector2f(xPos, 300.f));
+		gui.add(newButton);
+		xPos += newButton->getFullSize().x;
+	});
 
 	while (window.isOpen())
 	{
@@ -95,7 +103,6 @@ int main()
 		}
 
 		window.clear();
-		window.draw(circle);
 		gui.draw();
 		window.display();
 	}
