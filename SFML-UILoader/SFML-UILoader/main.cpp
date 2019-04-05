@@ -1,8 +1,10 @@
 #include <SFML/Graphics.hpp>
 #include <Windows.h>
 #include <fstream>
+#include <rapidjson/filereadstream.h>
+#include <rapidjson/document.h>
 
-std::string openFile()
+std::string userSelectFile()
 {
 	OPENFILENAME ofn;
 	char szFile[260];
@@ -41,27 +43,37 @@ std::string openFile()
 
 int main()
 {
-	std::string file = openFile();
-
-	size_t pos = file.find("\\");;
-	while (pos != std::string::npos)
+	std::string userChosenFile;
+	bool foundFile = false;
+	do
 	{
-		file.replace(file.begin()+pos, file.begin()+pos+1, "/");
-		pos = file.find("\\");
-	}
+		userChosenFile = userSelectFile();
 
-	std::ifstream inFile;
-	inFile.open(file, std::ios::in);
-	if (!inFile)
-	{
-		exit(1);
-	}
+		if (userChosenFile.empty())
+		{
+			exit(1);
+		}
 
-	std::string data;
+		FILE* fb;
+		errno_t err;
+		if ((err = fopen_s(&fb, userChosenFile.c_str(), "rb")) == 0)
+		{
+			char readBuffer[65536];
+			rapidjson::FileReadStream is(fb, readBuffer, sizeof(readBuffer));
 
-	while (inFile >> data);
+			rapidjson::Document d;
+			d.ParseStream(is);
 
-	inFile.close();
+			fclose(fb);
+
+			if (!d.HasParseError())
+			{
+				foundFile = true;
+			}
+		}
+	} while (!foundFile);
+
+	
 
 	sf::RenderWindow window(sf::VideoMode(200, 200), "SFML Works!");
 	sf::CircleShape circle(100.f);
