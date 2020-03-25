@@ -74,8 +74,6 @@ int main(int argc, char **argv)
 		sourceFile = userSelectFile();
 	}
 
-	
-
 	sf::RenderWindow window(sf::VideoMode(800, 600), "SFML Works!");
 	tgui::Gui gui(window);
 	try {
