@@ -35,27 +35,35 @@ class GuiBuilder;
 class Form
 {
 public:
-    Form(GuiBuilder* guiBuilder, const std::string& filename, tgui::ChildWindow::Ptr formWindow);
-    std::string addWidget(tgui::Widget::Ptr widget, tgui::Container* parent = nullptr);
-    std::string addExistingWidget(tgui::Widget::Ptr widget);
+    Form(GuiBuilder* guiBuilder, const std::string& filename, tgui::ChildWindow::Ptr formWindow, sf::Vector2f formSize);
+    std::string addWidget(tgui::Widget::Ptr widget, tgui::Container* parent, bool selectNewWidget = true);
     void removeWidget(const std::string& id);
     std::shared_ptr<WidgetInfo> getWidget(const std::string& id) const;
+    std::shared_ptr<WidgetInfo> getWidgetByName(const std::string& name) const;
     std::vector<std::shared_ptr<WidgetInfo>> getWidgets() const;
+    std::shared_ptr<tgui::Group> getRootWidgetsGroup() const;
     std::shared_ptr<WidgetInfo> getSelectedWidget() const;
-    void setSelectedWidgetName(const std::string& name);
+    bool setSelectedWidgetName(const std::string& name);
     void setSelectedWidgetRenderer(const std::string& renderer);
     void updateSelectionSquarePositions();
     void selectWidgetById(const std::string& id);
+    void selectWidgetByName(const std::string& name);
+    void selectParent();
     void mouseMoved(sf::Vector2i pos);
     void mouseReleased();
+    bool rightMouseClick(sf::Vector2i pos);
+    void arrowKeyPressed(const sf::Event::KeyEvent& keyEvent);
     void setFilename(const sf::String& filename);
     sf::String getFilename() const;
-    void setSize(sf::Vector2i filename);
-    sf::Vector2i getSize() const;
+    void setSize(sf::Vector2f size);
+    sf::Vector2f getSize() const;
     void setChanged(bool changed);
     bool isChanged() const;
+    void focus();
+    bool hasFocus() const;
     bool load();
     void save();
+    void drawExtra(sf::RenderWindow& window) const;
 
 private:
     void importLoadedWidgets(tgui::Container::Ptr parent);
@@ -64,6 +72,7 @@ private:
     void onFormMousePress(sf::Vector2f pos);
     void onDrag(sf::Vector2i mousePos);
     void selectWidget(std::shared_ptr<WidgetInfo> widget);
+    void drawLine(sf::RenderWindow& window, sf::Vector2f startPoint, sf::Vector2f endPoint) const;
 
 private:
 
@@ -74,13 +83,12 @@ private:
     std::shared_ptr<WidgetInfo> m_selectedWidget = nullptr;
     std::array<tgui::Button::Ptr, 8> m_selectionSquares;
     std::map<std::string, std::shared_ptr<WidgetInfo>> m_widgets;
-    unsigned int m_idCounter = 0;
     bool m_changed = false;
     bool m_draggingWidget = false;
     tgui::Button::Ptr m_draggingSelectionSquare;
     sf::Vector2f m_draggingPos;
     sf::String m_filename;
-    sf::Vector2i m_size;
+    sf::Vector2f m_size;
 };
 
 #endif // TGUI_GUI_BUILDER_FORM_HPP

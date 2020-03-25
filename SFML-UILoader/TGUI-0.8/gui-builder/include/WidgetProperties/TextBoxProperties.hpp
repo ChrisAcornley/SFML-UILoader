@@ -33,15 +33,17 @@ struct TextBoxProperties : WidgetProperties
 {
     // TODO: Scrollbar renderer
 
-    void updateProperty(tgui::Widget::Ptr widget, const std::string& property, const std::string& value) const override
+    void updateProperty(tgui::Widget::Ptr widget, const std::string& property, const sf::String& value) const override
     {
         auto textBox = std::dynamic_pointer_cast<tgui::TextBox>(widget);
         if (property == "Text")
-            textBox->setText(value);
+            textBox->setText(tgui::Deserializer::deserialize(tgui::ObjectConverter::Type::String, value).getString());
+        else if (property == "DefaultText")
+            textBox->setDefaultText(tgui::Deserializer::deserialize(tgui::ObjectConverter::Type::String, value).getString());
         else if (property == "TextSize")
-            textBox->setTextSize(static_cast<unsigned int>(tgui::stoi(value)));
+            textBox->setTextSize(static_cast<unsigned int>(tgui::strToInt(value.toAnsiString())));
         else if (property == "MaximumCharacters")
-            textBox->setMaximumCharacters(static_cast<unsigned int>(tgui::stoi(value)));
+            textBox->setMaximumCharacters(static_cast<unsigned int>(tgui::strToInt(value.toAnsiString())));
         else if (property == "ReadOnly")
             textBox->setReadOnly(parseBoolean(value, false));
         else if (property == "VerticalScrollbarPolicy")
@@ -56,7 +58,8 @@ struct TextBoxProperties : WidgetProperties
     {
         auto pair = WidgetProperties::initProperties(widget);
         auto textBox = std::dynamic_pointer_cast<tgui::TextBox>(widget);
-        pair.first["Text"] = {"String", textBox->getText()};
+        pair.first["Text"] = {"MultilineString", tgui::Serializer::serialize(textBox->getText())};
+        pair.first["DefaultText"] = {"MultilineString", tgui::Serializer::serialize(textBox->getDefaultText())};
         pair.first["TextSize"] = {"UInt", tgui::to_string(textBox->getTextSize())};
         pair.first["MaximumCharacters"] = {"UInt", tgui::to_string(textBox->getMaximumCharacters())};
         pair.first["ReadOnly"] = {"Bool", tgui::Serializer::serialize(textBox->isReadOnly())};
@@ -74,6 +77,7 @@ struct TextBoxProperties : WidgetProperties
         pair.second["CaretColor"] = {"Color", tgui::Serializer::serialize(renderer->getCaretColor())};
         pair.second["CaretWidth"] = {"Float", tgui::to_string(renderer->getCaretWidth())};
         pair.second["TextureBackground"] = {"Texture", tgui::Serializer::serialize(renderer->getTextureBackground())};
+        pair.second["ScrollbarWidth"] = {"Float", tgui::to_string(renderer->getScrollbarWidth())};
         return pair;
     }
 

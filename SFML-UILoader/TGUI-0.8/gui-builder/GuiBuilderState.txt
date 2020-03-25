@@ -1,2 +1,3 @@
-LastOpenedFile = "layout1.txt";
+FormSize = (800, 600);
+RecentFiles = ["testform.txt"];
 Themes = ["themes/BabyBlue.txt", "themes/BabyBlue.txt", "themes/Black.txt", "themes/TransparentGrey.txt"];

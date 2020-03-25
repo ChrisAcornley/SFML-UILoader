@@ -31,13 +31,15 @@
 
 struct LabelProperties : WidgetProperties
 {
-    void updateProperty(tgui::Widget::Ptr widget, const std::string& property, const std::string& value) const override
+    // TODO: Scrollbar renderer
+
+    void updateProperty(tgui::Widget::Ptr widget, const std::string& property, const sf::String& value) const override
     {
         auto label = std::dynamic_pointer_cast<tgui::Label>(widget);
         if (property == "Text")
-            label->setText(value);
+            label->setText(tgui::Deserializer::deserialize(tgui::ObjectConverter::Type::String, value).getString());
         else if (property == "TextSize")
-            label->setTextSize(static_cast<unsigned int>(tgui::stoi(value)));
+            label->setTextSize(static_cast<unsigned int>(tgui::strToInt(value.toAnsiString())));
         else if (property == "HorizontalAlignment")
             label->setHorizontalAlignment(deserializeHorizontalAlignment(value));
         else if (property == "VerticalAlignment")
@@ -47,7 +49,7 @@ struct LabelProperties : WidgetProperties
         else if (property == "AutoSize")
             label->setAutoSize(parseBoolean(value, true));
         else if (property == "MaximumTextWidth")
-            label->setMaximumTextWidth(tgui::stof(value));
+            label->setMaximumTextWidth(tgui::strToFloat(value));
         else if (property == "IgnoreMouseEvents")
             label->ignoreMouseEvents(parseBoolean(value, false));
         else
@@ -58,7 +60,7 @@ struct LabelProperties : WidgetProperties
     {
         auto pair = WidgetProperties::initProperties(widget);
         auto label = std::dynamic_pointer_cast<tgui::Label>(widget);
-        pair.first["Text"] = {"String", label->getText()};
+        pair.first["Text"] = {"MultilineString", tgui::Serializer::serialize(label->getText())};
         pair.first["TextSize"] = {"UInt", tgui::to_string(label->getTextSize())};
         pair.first["HorizontalAlignment"] = {"Enum{Left,Center,Right}", serializeHorizontalAlignment(label->getHorizontalAlignment())};
         pair.first["VerticalAlignment"] = {"Enum{Top,Center,Bottom}", serializeVerticalAlignment(label->getVerticalAlignment())};
@@ -73,7 +75,11 @@ struct LabelProperties : WidgetProperties
         pair.second["TextColor"] = {"Color", tgui::Serializer::serialize(renderer->getTextColor())};
         pair.second["BackgroundColor"] = {"Color", tgui::Serializer::serialize(renderer->getBackgroundColor())};
         pair.second["BorderColor"] = {"Color", tgui::Serializer::serialize(renderer->getBorderColor())};
+        pair.second["TextOutlineColor"] = {"Color", tgui::Serializer::serialize(renderer->getTextOutlineColor())};
+        pair.second["TextOutlineThickness"] = {"Float", tgui::to_string(renderer->getTextOutlineThickness())};
         pair.second["TextStyle"] = {"TextStyle", tgui::Serializer::serialize(renderer->getTextStyle())};
+        pair.second["TextureBackground"] = {"Texture", tgui::Serializer::serialize(renderer->getTextureBackground())};
+        pair.second["ScrollbarWidth"] = {"Float", tgui::to_string(renderer->getScrollbarWidth())};
         return pair;
     }
 

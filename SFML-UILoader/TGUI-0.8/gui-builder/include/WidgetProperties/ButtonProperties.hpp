@@ -31,13 +31,13 @@
 
 struct ButtonProperties : WidgetProperties
 {
-    void updateProperty(tgui::Widget::Ptr widget, const std::string& property, const std::string& value) const override
+    void updateProperty(tgui::Widget::Ptr widget, const std::string& property, const sf::String& value) const override
     {
         auto button = std::dynamic_pointer_cast<tgui::Button>(widget);
         if (property == "Text")
             button->setText(value);
         else if (property == "TextSize")
-            button->setTextSize(static_cast<unsigned int>(tgui::stoi(value)));
+            button->setTextSize(static_cast<unsigned int>(tgui::strToInt(value.toAnsiString())));
         else
             WidgetProperties::updateProperty(widget, property, value);
     }
@@ -66,6 +66,8 @@ struct ButtonProperties : WidgetProperties
         pair.second["BorderColorDown"] = {"Color", tgui::Serializer::serialize(renderer->getBorderColorDown())};
         pair.second["BorderColorDisabled"] = {"Color", tgui::Serializer::serialize(renderer->getBorderColorDisabled())};
         pair.second["BorderColorFocused"] = {"Color", tgui::Serializer::serialize(renderer->getBorderColorFocused())};
+        pair.second["TextOutlineColor"] = {"Color", tgui::Serializer::serialize(renderer->getTextOutlineColor())};
+        pair.second["TextOutlineThickness"] = {"Float", tgui::to_string(renderer->getTextOutlineThickness())};
         pair.second["Texture"] = {"Texture", tgui::Serializer::serialize(renderer->getTexture())};
         pair.second["TextureHover"] = {"Texture", tgui::Serializer::serialize(renderer->getTextureHover())};
         pair.second["TextureDown"] = {"Texture", tgui::Serializer::serialize(renderer->getTextureDown())};

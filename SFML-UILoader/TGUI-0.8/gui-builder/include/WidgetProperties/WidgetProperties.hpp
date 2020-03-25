@@ -40,20 +40,22 @@ struct WidgetProperties
 {
     virtual ~WidgetProperties() = default;
 
-    virtual void updateProperty(tgui::Widget::Ptr widget, const std::string& property, const std::string& value) const
+    virtual void updateProperty(tgui::Widget::Ptr widget, const std::string& property, const sf::String& value) const
     {
         if (property == "Left")
-            widget->setPosition(value, widget->getPositionLayout().y);
+            widget->setPosition(value.toAnsiString(), widget->getPositionLayout().y);
         else if (property == "Top")
-            widget->setPosition(widget->getPositionLayout().x, value);
+            widget->setPosition(widget->getPositionLayout().x, value.toAnsiString());
         else if (property == "Width")
-            widget->setSize(value, widget->getSizeLayout().y);
+            widget->setSize(value.toAnsiString(), widget->getSizeLayout().y);
         else if (property == "Height")
-            widget->setSize(widget->getSizeLayout().x, value);
+            widget->setSize(widget->getSizeLayout().x, value.toAnsiString());
         else if (property == "Visible")
             widget->setVisible(parseBoolean(value, true));
         else if (property == "Enabled")
             widget->setEnabled(parseBoolean(value, true));
+        else if (property == "UserData")
+            widget->setUserData(value.toAnsiString());
         else // Renderer property
             widget->getRenderer()->setProperty(property, value);
     }
@@ -61,22 +63,31 @@ struct WidgetProperties
     virtual PropertyValueMapPair initProperties(tgui::Widget::Ptr widget) const
     {
         PropertyValueMap pairs;
-        pairs["Left"] = {"Float", tgui::to_string(widget->getPosition().x)};
-        pairs["Top"] = {"Float", tgui::to_string(widget->getPosition().y)};
-        pairs["Width"] = {"Float", tgui::to_string(widget->getSize().x)};
-        pairs["Height"] = {"Float", tgui::to_string(widget->getSize().y)};
+        pairs["Left"] = {"String", widget->getPositionLayout().x.toString()};
+        pairs["Top"] = {"String", widget->getPositionLayout().y.toString()};
+        pairs["Width"] = {"String", widget->getSizeLayout().x.toString()};
+        pairs["Height"] = {"String", widget->getSizeLayout().y.toString()};
         pairs["Visible"] = {"Bool", tgui::Serializer::serialize(widget->isVisible())};
         pairs["Enabled"] = {"Bool", tgui::Serializer::serialize(widget->isEnabled())};
+        try
+        {
+            pairs["UserData"] = {"String", widget->getUserData<std::string>()};
+        }
+        catch(const std::bad_cast&)
+        {
+            pairs["UserData"] = {"String", ""};
+        }
+
 
         PropertyValueMap rendererPairs;
         const auto renderer = widget->getSharedRenderer();
         rendererPairs["Opacity"] = {"Float", tgui::to_string(renderer->getOpacity())};
-        rendererPairs["Font"] = {"Font", renderer->getFont().getId()};
+        rendererPairs["OpacityDisabled"] = {"Float", tgui::to_string(renderer->getOpacityDisabled())};
+        rendererPairs["Font"] = {"Font", tgui::Serializer::serialize(renderer->getFont())};
         rendererPairs["TransparentTexture"] = {"Bool", tgui::Serializer::serialize(renderer->getTransparentTexture())};
         return {pairs, rendererPairs};
     }
 
-protected:
 
     static bool parseBoolean(std::string str, bool defaultValue)
     {

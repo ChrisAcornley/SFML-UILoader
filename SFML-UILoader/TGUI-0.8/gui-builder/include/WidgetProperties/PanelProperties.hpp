@@ -26,20 +26,20 @@
 #ifndef TGUI_GUI_BUILDER_PANEL_PROPERTIES_HPP
 #define TGUI_GUI_BUILDER_PANEL_PROPERTIES_HPP
 
-#include "WidgetProperties.hpp"
+#include "GroupProperties.hpp"
 #include <TGUI/Widgets/Panel.hpp>
 
-struct PanelProperties : WidgetProperties
+struct PanelProperties : GroupProperties
 {
     PropertyValueMapPair initProperties(tgui::Widget::Ptr widget) const override
     {
-        auto pair = WidgetProperties::initProperties(widget);
+        auto pair = GroupProperties::initProperties(widget);
         auto panel = std::dynamic_pointer_cast<tgui::Panel>(widget);
 
         const auto renderer = panel->getSharedRenderer();
         pair.second["Borders"] = {"Outline", renderer->getBorders().toString()};
-        pair.second["Padding"] = {"Outline", renderer->getPadding().toString()};
         pair.second["BackgroundColor"] = {"Color", tgui::Serializer::serialize(renderer->getBackgroundColor())};
+        pair.second["TextureBackground"] = {"Texture", tgui::Serializer::serialize(renderer->getTextureBackground())};
         return pair;
     }
 };

@@ -4,6 +4,7 @@
 #include <rapidjson/filereadstream.h>
 #include <rapidjson/document.h>
 #include <TGUI/TGUI.hpp>
+#include <iostream>
 
 std::string userSelectFile()
 {
@@ -42,68 +43,84 @@ std::string userSelectFile()
 	return std::string(szFile);
 }
 
-int main()
+void TakeScreenshot(sf::RenderWindow& window, const std::string& destinationFile)
 {
-	std::string userChosenFile = userSelectFile();
-	/*bool foundFile = false;
-	do
+	sf::Texture outputData;
+	outputData.create(window.getSize().x, window.getSize().y);
+	outputData.update(window);
+	if (outputData.copyToImage().saveToFile(destinationFile))
 	{
-		userChosenFile = userSelectFile();
+		std::cout << "Saved image to " << destinationFile << std::endl;
+	}
+	else
+	{
+		std::cout << "ERROR: Failed to save screenshot " << destinationFile << std::endl;
+	}
+}
 
-		if (userChosenFile.empty())
-		{
-			exit(1);
-		}
+int main(int argc, char **argv)
+{
+	std::string sourceFile;
+	std::string dstFile;
 
-		FILE* fb;
-		errno_t err;
-		if ((err = fopen_s(&fb, userChosenFile.c_str(), "rb")) == 0)
-		{
-			char readBuffer[65536];
-			rapidjson::FileReadStream is(fb, readBuffer, sizeof(readBuffer));
+	if (argc > 1) {
+		// first arg is location of source file
+		sourceFile = argv[1];
 
-			rapidjson::Document d;
-			d.ParseStream(is);
+		// second arg is location of destination jpg
+		dstFile = argv[2];
+	}
+	else {
+		sourceFile = userSelectFile();
+	}
 
-			fclose(fb);
-
-			if (!d.HasParseError())
-			{
-				foundFile = true;
-			}
-		}
-	} while (!foundFile);
-*/
 	
 
 	sf::RenderWindow window(sf::VideoMode(800, 600), "SFML Works!");
 	tgui::Gui gui(window);
-	gui.loadWidgetsFromFile(userChosenFile);
-
-	tgui::Button::Ptr button = gui.get<tgui::Button>("Button1");
-	
-	button->connect("pressed", [&]()->void {
-		static float xPos = 0.f;
-		tgui::Button::Ptr newButton = tgui::Button::create("Custom Button");
-		newButton->setPosition(sf::Vector2f(xPos, 300.f));
-		gui.add(newButton);
-		xPos += newButton->getFullSize().x;
-	});
-
-	while (window.isOpen())
-	{
-		sf::Event event;
-		while (window.pollEvent(event))
-		{
-			gui.handleEvent(event);
-			if (event.type == sf::Event::Closed)
-			{
-				window.close();
-			}
-		}
-
-		window.clear();
-		gui.draw();
-		window.display();
+	try {
+		gui.loadWidgetsFromFile(sourceFile);
 	}
+	catch (tgui::Exception exception)
+	{
+		std::cout << exception.what() << std::endl;
+		return 0;
+	}
+
+	if (!dstFile.empty())
+	{
+		if (window.isOpen())
+		{
+			window.clear();
+			gui.draw();
+			window.display();
+			TakeScreenshot(window, dstFile);
+		}
+		else
+		{
+			std::cout << "Window is not open, cannot display image" << std::endl;
+		}
+	}
+	else
+	{
+		while (window.isOpen())
+		{
+			sf::Event event;
+			while (window.pollEvent(event))
+			{
+				gui.handleEvent(event);
+				if (event.type == sf::Event::Closed)
+				{
+					window.close();
+				}
+			}
+
+			window.clear();
+			gui.draw();
+			window.display();
+		}
+	}
+
+	gui.removeAllWidgets();
+	window.close();
 }

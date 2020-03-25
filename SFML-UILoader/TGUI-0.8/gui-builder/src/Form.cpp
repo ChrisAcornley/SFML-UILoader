@@ -26,30 +26,33 @@
 #include "Form.hpp"
 #include "GuiBuilder.hpp"
 
+#include <stack>
 #include <cassert>
 #include <cmath>
 
+const static float MOVE_STEP = 10;
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-Form::Form(GuiBuilder* guiBuilder, const std::string& filename, tgui::ChildWindow::Ptr formWindow) :
+Form::Form(GuiBuilder* guiBuilder, const std::string& filename, tgui::ChildWindow::Ptr formWindow, sf::Vector2f formSize) :
     m_guiBuilder      {guiBuilder},
     m_formWindow      {formWindow},
     m_scrollablePanel {formWindow->get<tgui::ScrollablePanel>("ScrollablePanel")},
-    m_widgetsContainer{m_scrollablePanel->get<tgui::Group>("WidgetContainer")},
+    m_widgetsContainer{m_scrollablePanel->get<tgui::Panel>("WidgetContainer")},
     m_filename        {filename}
 {
     m_widgets["form"] = nullptr;
 
     m_formWindow->setTitle(filename);
     m_formWindow->connect("Closed", [this]{ m_guiBuilder->closeForm(this); });
-    m_formWindow->connect("SizeChanged", [this]{ m_scrollablePanel->setSize(m_formWindow->getSize()); });
+    m_formWindow->connect("SizeChanged", [this] { m_scrollablePanel->setSize(m_formWindow->getSize()); });
 
     auto eventHandler = tgui::ClickableWidget::create();
     eventHandler->connect("MousePressed", [=](sf::Vector2f pos){ onFormMousePress(pos); });
     m_scrollablePanel->add(eventHandler, "EventHandler");
 
     m_scrollablePanel->setSize(m_formWindow->getSize());
-    setSize(sf::Vector2i{sf::Vector2f{m_formWindow->getSize()}});
+    setSize(formSize);
 
     tgui::Theme selectionSquareTheme{"resources/SelectionSquare.txt"};
     for (auto& square : m_selectionSquares)
@@ -65,12 +68,31 @@ Form::Form(GuiBuilder* guiBuilder, const std::string& filename, tgui::ChildWindo
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::string Form::addWidget(tgui::Widget::Ptr widget, tgui::Container* parent)
+std::string Form::addWidget(tgui::Widget::Ptr widget, tgui::Container* parent, bool selectNewWidget)
 {
     const std::string id = tgui::to_string(widget.get());
     m_widgets[id] = std::make_shared<WidgetInfo>(widget);
 
-    const std::string name = "Widget" + tgui::to_string(++m_idCounter);
+    const std::string widgetType = widget->getWidgetType();
+    bool foundAvailableName = false;
+    unsigned int count = 0;
+    std::string name;
+    while (!foundAvailableName)
+    {
+        name = widgetType + tgui::to_string(++count);
+
+        foundAvailableName = true;
+        for (const auto& pair : m_widgets)
+        {
+            const auto& widgetInfo = pair.second;
+            if (widgetInfo && (widgetInfo->name == name))
+            {
+                foundAvailableName = false;
+                break;
+            }
+        }
+    }
+
     m_widgets[id]->name = name;
 
     if (parent)
@@ -78,21 +100,8 @@ std::string Form::addWidget(tgui::Widget::Ptr widget, tgui::Container* parent)
     else
         m_widgetsContainer->add(widget, name);
 
-    selectWidget(m_widgets[id]);
-
-    setChanged(true);
-    return name;
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-std::string Form::addExistingWidget(tgui::Widget::Ptr widget)
-{
-    const std::string id = tgui::to_string(widget.get());
-    m_widgets[id] = std::make_shared<WidgetInfo>(widget);
-
-    const std::string name = "Widget" + tgui::to_string(++m_idCounter);
-    m_widgets[id]->name = name;
+    if (selectNewWidget)
+        selectWidget(m_widgets[id]);
 
     setChanged(true);
     return name;
@@ -104,8 +113,31 @@ void Form::removeWidget(const std::string& id)
 {
     const auto widget = m_widgets[id];
     assert(widget != nullptr);
-    widget->ptr->getParent()->remove(widget->ptr);
 
+    // Remove the child widgets
+    if (widget->ptr->isContainer())
+    {
+        std::vector<std::string> childIds;
+        std::stack<tgui::Container::Ptr> parentsToSearch;
+        parentsToSearch.push(widget->ptr->cast<tgui::Container>());
+        while (!parentsToSearch.empty())
+        {
+            tgui::Container::Ptr parent = parentsToSearch.top();
+            parentsToSearch.pop();
+            for (const auto& childWidget : parent->getWidgets())
+            {
+                childIds.push_back(tgui::to_string(childWidget.get()));
+                if (childWidget->isContainer())
+                    parentsToSearch.push(childWidget->cast<tgui::Container>());
+            }
+        }
+
+        for (const auto& childId : childIds)
+            m_widgets.erase(childId);
+    }
+
+    // Now remove the widget itself
+    widget->ptr->getParent()->remove(widget->ptr);
     m_widgets.erase(id);
     setChanged(true);
 }
@@ -116,6 +148,30 @@ std::shared_ptr<WidgetInfo> Form::getWidget(const std::string& id) const
 {
     assert(m_widgets.find(id) != m_widgets.end());
     return m_widgets.at(id);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+std::shared_ptr<WidgetInfo> Form::getWidgetByName(const std::string& name) const
+{
+    if (name == m_filename)
+        return std::shared_ptr<WidgetInfo>();
+
+    const auto it = std::find_if(
+        m_widgets.begin(),
+        m_widgets.end(),
+        [&name](const auto& idAndWidgetInfo)
+        {
+            const auto& widgetIndo = idAndWidgetInfo.second;
+            if (widgetIndo)
+                return idAndWidgetInfo.second->name == name;
+            else
+                return false;
+        }
+    );
+
+    assert(it != m_widgets.end());
+    return it->second;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -135,6 +191,13 @@ std::vector<std::shared_ptr<WidgetInfo>> Form::getWidgets() const
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+std::shared_ptr<tgui::Group> Form::getRootWidgetsGroup() const
+{
+    return m_widgetsContainer;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 std::shared_ptr<WidgetInfo> Form::getSelectedWidget() const
 {
     return m_selectedWidget;
@@ -142,34 +205,24 @@ std::shared_ptr<WidgetInfo> Form::getSelectedWidget() const
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Form::setSelectedWidgetName(const std::string& name)
+bool Form::setSelectedWidgetName(const std::string& name)
 {
     assert(m_selectedWidget != nullptr);
 
-    bool widgetFound = false;
-    auto widgets = m_widgetsContainer->getWidgets();
-    for (auto& widget : widgets)
+    // Don't allow setting a name that is already used by a different widget
+    for (const auto& pair : m_widgets)
     {
-        if (widgetFound)
+        const auto& widgetInfo = pair.second;
+        if (widgetInfo && (widgetInfo->name == name))
         {
-            // These widgets appeared after the selected widgets and thus have to be displayed in front of it.
-            // By removing and re-adding the selected widget we however changed the order, which we are correcting here.
-            widget->moveToFront();
-        }
-        else
-        {
-            if (widget == m_selectedWidget->ptr)
-            {
-                // Remove the selected widget and add it again with a different name
-                tgui::Container* parent = widget->getParent();
-                parent->remove(m_selectedWidget->ptr);
-                parent->add(m_selectedWidget->ptr, name);
-
-                m_selectedWidget->name = name;
-                widgetFound = true;
-            }
+            if (widgetInfo->ptr != m_selectedWidget->ptr)
+                return false;
         }
     }
+
+    m_selectedWidget->ptr->setWidgetName(name);
+    m_selectedWidget->name = name;
+    return true;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -188,6 +241,14 @@ void Form::updateSelectionSquarePositions()
         parentWidget = parentWidget->getParent();
     }
 
+    // Exception for ChildWindow as its size is currently its client size instead of the full size
+    if (widget->getWidgetType() == "ChildWindow")
+    {
+        auto renderer = widget->cast<tgui::ChildWindow>()->getSharedRenderer();
+        position.x += renderer->getBorders().getLeft();
+        position.y += renderer->getBorders().getTop() + renderer->getTitleBarHeight() + renderer->getBorderBelowTitleBar();
+    }
+
     m_selectionSquares[0]->setPosition({position.x,                               position.y});
     m_selectionSquares[1]->setPosition({position.x + (widget->getSize().x / 2.f), position.y});
     m_selectionSquares[2]->setPosition({position.x + widget->getSize().x,         position.y});
@@ -199,8 +260,10 @@ void Form::updateSelectionSquarePositions()
 
     // The positions given to the squares where those of its center
     for (auto& square : m_selectionSquares)
+    {
         square->setPosition({std::round(square->getPosition().x - (square->getSize().y / 2.f)),
                              std::round(square->getPosition().y - (square->getSize().x / 2.f))});
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -208,6 +271,30 @@ void Form::updateSelectionSquarePositions()
 void Form::selectWidgetById(const std::string& id)
 {
     selectWidget(m_widgets[id]);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Form::selectWidgetByName(const std::string& name)
+{
+    selectWidget(getWidgetByName(name));
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Form::selectParent()
+{
+    if (!m_selectedWidget)
+        return;
+
+    // If the widget was added directly to the form then select the form
+    if (m_selectedWidget->ptr->getParent() == m_widgetsContainer.get())
+    {
+        selectWidget(nullptr);
+        return;
+    }
+
+    selectWidget(m_widgets[tgui::to_string(m_selectedWidget->ptr->getParent())]);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -228,6 +315,127 @@ void Form::mouseReleased()
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+bool Form::rightMouseClick(sf::Vector2i pos)
+{
+    sf::Vector2f relativeWindowPos{(pos.x - m_formWindow->getAbsolutePosition().x), (pos.y - m_formWindow->getAbsolutePosition().y)};
+    if (!tgui::FloatRect{m_formWindow->getChildWidgetsOffset(), m_formWindow->getSize()}.contains(relativeWindowPos))
+        return false;
+
+    const sf::Vector2f relativePanelPos{
+        (pos.x - m_scrollablePanel->get("EventHandler")->getAbsolutePosition().x),
+        (pos.y - m_scrollablePanel->get("EventHandler")->getAbsolutePosition().y)};
+
+    onFormMousePress(relativePanelPos);
+    mouseReleased();
+    return true;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Form::arrowKeyPressed(const sf::Event::KeyEvent& keyEvent)
+{
+    if (!m_selectedWidget)
+        return;
+
+    auto selectedWidget = m_selectedWidget->ptr;
+
+    if (keyEvent.shift && keyEvent.control)
+    {
+        if (keyEvent.code == sf::Keyboard::Left)
+            selectedWidget->setPosition({selectedWidget->getPosition().x - MOVE_STEP, selectedWidget->getPositionLayout().y});
+        else if (keyEvent.code == sf::Keyboard::Right)
+            selectedWidget->setPosition({selectedWidget->getPosition().x + MOVE_STEP, selectedWidget->getPositionLayout().y});
+        else if (keyEvent.code == sf::Keyboard::Up)
+            selectedWidget->setPosition({selectedWidget->getPositionLayout().x, selectedWidget->getPosition().y - MOVE_STEP});
+        else if (keyEvent.code == sf::Keyboard::Down)
+            selectedWidget->setPosition({selectedWidget->getPositionLayout().x, selectedWidget->getPosition().y + MOVE_STEP});
+
+        setChanged(true);
+        updateSelectionSquarePositions();
+        m_guiBuilder->reloadProperties();
+    }
+    else if (keyEvent.shift)
+    {
+        if (keyEvent.code == sf::Keyboard::Left)
+            selectedWidget->setSize({selectedWidget->getSize().x - 1, selectedWidget->getSizeLayout().y});
+        else if (keyEvent.code == sf::Keyboard::Right)
+            selectedWidget->setSize({selectedWidget->getSize().x + 1, selectedWidget->getSizeLayout().y});
+        else if (keyEvent.code == sf::Keyboard::Up)
+            selectedWidget->setSize({selectedWidget->getSizeLayout().x, selectedWidget->getSize().y - 1});
+        else if (keyEvent.code == sf::Keyboard::Down)
+            selectedWidget->setSize({selectedWidget->getSizeLayout().x, selectedWidget->getSize().y + 1});
+
+        setChanged(true);
+        updateSelectionSquarePositions();
+        m_guiBuilder->reloadProperties();
+    }
+    else if (keyEvent.control)
+    {
+        if (keyEvent.code == sf::Keyboard::Left)
+            selectedWidget->setPosition({selectedWidget->getPosition().x - 1, selectedWidget->getPositionLayout().y});
+        else if (keyEvent.code == sf::Keyboard::Right)
+            selectedWidget->setPosition({selectedWidget->getPosition().x + 1, selectedWidget->getPositionLayout().y});
+        else if (keyEvent.code == sf::Keyboard::Up)
+            selectedWidget->setPosition({selectedWidget->getPositionLayout().x, selectedWidget->getPosition().y - 1});
+        else if (keyEvent.code == sf::Keyboard::Down)
+            selectedWidget->setPosition({selectedWidget->getPositionLayout().x, selectedWidget->getPosition().y + 1});
+
+        setChanged(true);
+        updateSelectionSquarePositions();
+        m_guiBuilder->reloadProperties();
+    }
+    else
+    {
+        sf::Vector2f selectedWidgetPoint;
+        if (keyEvent.code == sf::Keyboard::Left)
+            selectedWidgetPoint = {selectedWidget->getPosition().x, selectedWidget->getPosition().y + (selectedWidget->getSize().y / 2.f)};
+        else if (keyEvent.code == sf::Keyboard::Right)
+            selectedWidgetPoint = {selectedWidget->getPosition().x + selectedWidget->getSize().x, selectedWidget->getPosition().y + (selectedWidget->getSize().y / 2.f)};
+        else if (keyEvent.code == sf::Keyboard::Up)
+            selectedWidgetPoint = {selectedWidget->getPosition().x + (selectedWidget->getSize().x / 2.f), selectedWidget->getPosition().y};
+        else if (keyEvent.code == sf::Keyboard::Down)
+            selectedWidgetPoint = {selectedWidget->getPosition().x + (selectedWidget->getSize().x / 2.f), selectedWidget->getPosition().y + selectedWidget->getSize().y};
+
+        float closestDistance = std::numeric_limits<float>::infinity();
+        tgui::Widget::Ptr closestWidget = nullptr;
+        const auto widgets = selectedWidget->getParent()->getWidgets();
+        for (const auto& widget : widgets)
+        {
+            if (widget == selectedWidget)
+                continue;
+
+            sf::Vector2f widgetPoint;
+            if (keyEvent.code == sf::Keyboard::Left)
+                widgetPoint = {widget->getPosition().x + widget->getSize().x, widget->getPosition().y + (widget->getSize().y / 2.f)};
+            else if (keyEvent.code == sf::Keyboard::Right)
+                widgetPoint = {widget->getPosition().x, widget->getPosition().y + (widget->getSize().y / 2.f)};
+            else if (keyEvent.code == sf::Keyboard::Up)
+                widgetPoint = {widget->getPosition().x + (widget->getSize().x / 2.f), widget->getPosition().y + widget->getSize().y};
+            else if (keyEvent.code == sf::Keyboard::Down)
+                widgetPoint = {widget->getPosition().x + (widget->getSize().x / 2.f), widget->getPosition().y};
+
+            // Don't allow going in the opposite direction when there are no widgets on the chosen side
+            if (((keyEvent.code == sf::Keyboard::Left) && (widgetPoint.x >= selectedWidgetPoint.x))
+             || ((keyEvent.code == sf::Keyboard::Right) && (widgetPoint.x <= selectedWidgetPoint.x))
+             || ((keyEvent.code == sf::Keyboard::Up) && (widgetPoint.y >= selectedWidgetPoint.y))
+             || ((keyEvent.code == sf::Keyboard::Down) && (widgetPoint.y <= selectedWidgetPoint.y)))
+                continue;
+
+            const float distance = std::abs(widgetPoint.x - selectedWidgetPoint.x) + std::abs(widgetPoint.y - selectedWidgetPoint.y);
+            if (distance < closestDistance)
+            {
+                closestDistance = distance;
+                closestWidget = widget;
+            }
+        }
+
+        if (closestWidget)
+            selectWidget(m_widgets[tgui::to_string(closestWidget.get())]);
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void Form::setFilename(const sf::String& filename)
 {
     m_filename = filename;
@@ -243,18 +451,18 @@ sf::String Form::getFilename() const
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Form::setSize(sf::Vector2i size)
+void Form::setSize(sf::Vector2f size)
 {
     m_size = size;
 
-    m_scrollablePanel->setContentSize(sf::Vector2f{m_size});
-    m_widgetsContainer->setSize(sf::Vector2f{m_size});
-    m_scrollablePanel->get("EventHandler")->setSize(sf::Vector2f{m_size});
+    m_widgetsContainer->setSize(m_size);
+    m_scrollablePanel->setContentSize(m_size);
+    m_scrollablePanel->get("EventHandler")->setSize(m_size);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-sf::Vector2i Form::getSize() const
+sf::Vector2f Form::getSize() const
 {
     return m_size;
 }
@@ -276,6 +484,20 @@ void Form::setChanged(bool changed)
 bool Form::isChanged() const
 {
     return m_changed;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Form::focus()
+{
+    m_formWindow->setFocused(true);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+bool Form::hasFocus() const
+{
+    return m_formWindow->isFocused();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -304,6 +526,48 @@ void Form::save()
 {
     setChanged(false);
     m_widgetsContainer->saveWidgetsToFile(getFilename());
+
+    m_guiBuilder->formSaved(getFilename());
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Form::drawExtra(sf::RenderWindow& window) const
+{
+    if (!m_selectedWidget)
+        return;
+
+    if (!m_draggingWidget && !m_draggingSelectionSquare
+     && !sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LControl) && !sf::Keyboard::isKeyPressed(sf::Keyboard::Key::RControl)
+     && !sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift) && !sf::Keyboard::isKeyPressed(sf::Keyboard::Key::RShift))
+        return;
+
+    const auto selectedWidget = m_selectedWidget->ptr;
+    const sf::Vector2f selectedTopLeft = selectedWidget->getAbsolutePosition();
+    const sf::Vector2f selectedBottomRight = selectedWidget->getAbsolutePosition() + selectedWidget->getSize();
+    const auto widgets = selectedWidget->getParent()->getWidgets();
+    for (const auto& widget : widgets)
+    {
+        if (widget == selectedWidget)
+            continue;
+
+        const sf::Vector2f topLeft = widget->getAbsolutePosition();
+        const sf::Vector2f bottomRight = widget->getAbsolutePosition() + widget->getSize();
+
+        const float minX = std::min({selectedTopLeft.x, selectedBottomRight.x, topLeft.x, bottomRight.x});
+        const float maxX = std::max({selectedTopLeft.x, selectedBottomRight.x, topLeft.x, bottomRight.x});
+        const float minY = std::min({selectedTopLeft.y, selectedBottomRight.y, topLeft.y, bottomRight.y});
+        const float maxY = std::max({selectedTopLeft.y, selectedBottomRight.y, topLeft.y, bottomRight.y});
+
+        if ((topLeft.x == selectedTopLeft.x) || (topLeft.x == selectedBottomRight.x))
+            drawLine(window, {topLeft.x, minY}, {topLeft.x, maxY});
+        if ((topLeft.y == selectedTopLeft.y) || (topLeft.y == selectedBottomRight.y))
+            drawLine(window, {minX, topLeft.y}, {maxX, topLeft.y});
+        if ((bottomRight.x == selectedBottomRight.x) || (bottomRight.x == selectedTopLeft.x))
+            drawLine(window, {bottomRight.x, minY}, {bottomRight.x, maxY});
+        if ((bottomRight.y == selectedBottomRight.y) || (bottomRight.y == selectedTopLeft.y))
+            drawLine(window, {minX, bottomRight.y}, {maxX, bottomRight.y});
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -311,21 +575,12 @@ void Form::save()
 void Form::importLoadedWidgets(tgui::Container::Ptr parent)
 {
     const auto& widgets = parent->getWidgets();
-    const auto& widgetNames = parent->getWidgetNames();
     for (std::size_t i = 0; i < widgets.size(); ++i)
     {
         const std::string id = tgui::to_string(widgets[i].get());
         m_widgets[id] = std::make_shared<WidgetInfo>(widgets[i]);
-        m_widgets[id]->name = widgetNames[i];
+        m_widgets[id]->name = widgets[i]->getWidgetName();
         m_widgets[id]->theme = "Custom";
-
-        // Keep track of the highest id found in widgets with default names, to avoid creating new widgets with confusing names
-        if ((widgetNames[i].getSize() >= 7) && (widgetNames[i].substring(0, 6) == "Widget"))
-        {
-            const std::string potentialNumber = widgetNames[i].substring(6);
-            if (std::all_of(potentialNumber.begin(), potentialNumber.end(), ::isdigit))
-                m_idCounter = std::max(m_idCounter, static_cast<unsigned int>(tgui::stoi(potentialNumber)));
-        }
 
         if (widgets[i]->isContainer())
             importLoadedWidgets(std::static_pointer_cast<tgui::Container>(widgets[i]));
@@ -349,8 +604,13 @@ tgui::Widget::Ptr Form::getWidgetBelowMouse(tgui::Container::Ptr parent, sf::Vec
     for (auto it = widgets.rbegin(); it != widgets.rend(); ++it)
     {
         tgui::Widget::Ptr widget = *it;
-        if (widget && sf::FloatRect{widget->getPosition().x, widget->getPosition().y, widget->getSize().x, widget->getSize().y}.contains(pos))
+        if (widget && sf::FloatRect{widget->getPosition().x, widget->getPosition().y, widget->getFullSize().x, widget->getFullSize().y}.contains(pos))
         {
+            // Skip invisible widgets, those have to be selected using the combo box in the properties window.
+            // This prevents clicking on stuff you don't see instead of the thing you are trying to click on.
+            if (!widget->isVisible())
+                continue;
+
             if (widget->isContainer())
             {
                 tgui::Container::Ptr container = std::static_pointer_cast<tgui::Container>(widget);
@@ -389,37 +649,36 @@ void Form::onDrag(sf::Vector2i mousePos)
 
     const sf::Vector2f pos = sf::Vector2f{mousePos} - m_formWindow->getPosition() - m_formWindow->getChildWidgetsOffset() + m_scrollablePanel->getContentOffset();
     auto selectedWidget = m_selectedWidget->ptr;
-    const float step = 10;
 
     bool updated = false;
 
     if (m_draggingWidget)
     {
-        while (pos.x - m_draggingPos.x >= step)
+        while (pos.x - m_draggingPos.x >= MOVE_STEP)
         {
-            selectedWidget->setPosition({selectedWidget->getPosition().x + step, selectedWidget->getPosition().y});
-            m_draggingPos.x += step;
+            selectedWidget->setPosition({selectedWidget->getPosition().x + MOVE_STEP, selectedWidget->getPositionLayout().y});
+            m_draggingPos.x += MOVE_STEP;
             updated = true;
         }
 
-        while (m_draggingPos.x - pos.x >= step)
+        while (m_draggingPos.x - pos.x >= MOVE_STEP)
         {
-            selectedWidget->setPosition({selectedWidget->getPosition().x - step, selectedWidget->getPosition().y});
-            m_draggingPos.x -= step;
+            selectedWidget->setPosition({selectedWidget->getPosition().x - MOVE_STEP, selectedWidget->getPositionLayout().y});
+            m_draggingPos.x -= MOVE_STEP;
             updated = true;
         }
 
-        while (pos.y - m_draggingPos.y >= step)
+        while (pos.y - m_draggingPos.y >= MOVE_STEP)
         {
-            selectedWidget->setPosition({selectedWidget->getPosition().x, selectedWidget->getPosition().y + step});
-            m_draggingPos.y += step;
+            selectedWidget->setPosition({selectedWidget->getPositionLayout().x, selectedWidget->getPosition().y + MOVE_STEP});
+            m_draggingPos.y += MOVE_STEP;
             updated = true;
         }
 
-        while (m_draggingPos.y - pos.y >= step)
+        while (m_draggingPos.y - pos.y >= MOVE_STEP)
         {
-            selectedWidget->setPosition({selectedWidget->getPosition().x, selectedWidget->getPosition().y - step});
-            m_draggingPos.y -= step;
+            selectedWidget->setPosition({selectedWidget->getPositionLayout().x, selectedWidget->getPosition().y - MOVE_STEP});
+            m_draggingPos.y -= MOVE_STEP;
             updated = true;
         }
     }
@@ -428,69 +687,69 @@ void Form::onDrag(sf::Vector2i mousePos)
     {
         if (m_draggingSelectionSquare == m_selectionSquares[1]) // Top
         {
-            while (pos.y - m_draggingPos.y >= step)
+            while (pos.y - m_draggingPos.y >= MOVE_STEP)
             {
-                selectedWidget->setPosition({selectedWidget->getPosition().x, selectedWidget->getPosition().y + step});
-                selectedWidget->setSize({selectedWidget->getSize().x, selectedWidget->getSize().y - step});
-                m_draggingPos.y += step;
+                selectedWidget->setPosition({selectedWidget->getPositionLayout().x, selectedWidget->getPosition().y + MOVE_STEP});
+                selectedWidget->setSize({selectedWidget->getSizeLayout().x, selectedWidget->getSize().y - MOVE_STEP});
+                m_draggingPos.y += MOVE_STEP;
                 updated = true;
             }
 
-            while (m_draggingPos.y - pos.y >= step)
+            while (m_draggingPos.y - pos.y >= MOVE_STEP)
             {
-                selectedWidget->setPosition({selectedWidget->getPosition().x, selectedWidget->getPosition().y - step});
-                selectedWidget->setSize({selectedWidget->getSize().x, selectedWidget->getSize().y + step});
-                m_draggingPos.y -= step;
+                selectedWidget->setPosition({selectedWidget->getPositionLayout().x, selectedWidget->getPosition().y - MOVE_STEP});
+                selectedWidget->setSize({selectedWidget->getSizeLayout().x, selectedWidget->getSize().y + MOVE_STEP});
+                m_draggingPos.y -= MOVE_STEP;
                 updated = true;
             }
         }
         else if (m_draggingSelectionSquare == m_selectionSquares[3]) // Right
         {
-            while (pos.x - m_draggingPos.x >= step)
+            while (pos.x - m_draggingPos.x >= MOVE_STEP)
             {
-                selectedWidget->setSize({selectedWidget->getSize().x + step, selectedWidget->getSize().y});
-                m_draggingPos.x += step;
+                selectedWidget->setSize({selectedWidget->getSize().x + MOVE_STEP, selectedWidget->getSizeLayout().y});
+                m_draggingPos.x += MOVE_STEP;
                 updated = true;
             }
 
-            while (m_draggingPos.x - pos.x >= step)
+            while (m_draggingPos.x - pos.x >= MOVE_STEP)
             {
-                selectedWidget->setSize({selectedWidget->getSize().x - step, selectedWidget->getSize().y});
-                m_draggingPos.x -= step;
+                selectedWidget->setSize({selectedWidget->getSize().x - MOVE_STEP, selectedWidget->getSizeLayout().y});
+                m_draggingPos.x -= MOVE_STEP;
                 updated = true;
             }
         }
         else if (m_draggingSelectionSquare == m_selectionSquares[5]) // Bottom
         {
-            while (pos.y - m_draggingPos.y >= step)
+            while (pos.y - m_draggingPos.y >= MOVE_STEP)
             {
-                selectedWidget->setSize({selectedWidget->getSize().x, selectedWidget->getSize().y + step});
-                m_draggingPos.y += step;
+                selectedWidget->setSize({selectedWidget->getSizeLayout().x, selectedWidget->getSize().y + MOVE_STEP});
+                m_draggingPos.y += MOVE_STEP;
                 updated = true;
             }
 
-            while (m_draggingPos.y - pos.y >= step)
+            while (m_draggingPos.y - pos.y >= MOVE_STEP)
             {
-                selectedWidget->setSize({selectedWidget->getSize().x, selectedWidget->getSize().y - step});
-                m_draggingPos.y -= step;
+                selectedWidget->setSize({selectedWidget->getSizeLayout().x, selectedWidget->getSize().y - MOVE_STEP});
+                m_draggingPos.y -= MOVE_STEP;
                 updated = true;
             }
         }
         else if (m_draggingSelectionSquare == m_selectionSquares[7]) // Left
         {
-            while (pos.x - m_draggingPos.x >= step)
+            while (pos.x - m_draggingPos.x >= MOVE_STEP)
             {
-                selectedWidget->setPosition({selectedWidget->getPosition().x + step, selectedWidget->getPosition().y});
-                selectedWidget->setSize({selectedWidget->getSize().x - step, selectedWidget->getSize().y});
-                m_draggingPos.x += step;
+                selectedWidget->setPosition({selectedWidget->getPosition().x + MOVE_STEP, selectedWidget->getPositionLayout().y});
+                selectedWidget->setSize({selectedWidget->getSize().x - MOVE_STEP, selectedWidget->getSizeLayout().y});
+                m_draggingPos.x += MOVE_STEP;
                 updated = true;
             }
 
-            while (m_draggingPos.x - pos.x >= step)
+            while (m_draggingPos.x - pos.x >= MOVE_STEP)
             {
-                selectedWidget->setPosition({selectedWidget->getPosition().x - step, selectedWidget->getPosition().y});
-                selectedWidget->setSize({selectedWidget->getSize().x + step, selectedWidget->getSize().y});
-                m_draggingPos.x -= step;
+                selectedWidget->setPosition({selectedWidget->getPosition().x - MOVE_STEP, selectedWidget->getPositionLayout().y});
+                selectedWidget->setSize({selectedWidget->getSize().x + MOVE_STEP, selectedWidget->getSizeLayout().y});
+                m_draggingPos.x -= MOVE_STEP;
                 updated = true;
             }
         }
@@ -500,9 +759,9 @@ void Form::onDrag(sf::Vector2i mousePos)
 
             sf::Vector2f change;
             if (ratio <= 1)
-                change = sf::Vector2f(step, step * ratio);
+                change = sf::Vector2f(MOVE_STEP, MOVE_STEP * ratio);
             else
-                change = sf::Vector2f(step / ratio, step);
+                change = sf::Vector2f(MOVE_STEP / ratio, MOVE_STEP);
 
             if (m_draggingSelectionSquare == m_selectionSquares[0]) // Top left
             {
@@ -615,4 +874,15 @@ void Form::selectWidget(std::shared_ptr<WidgetInfo> widget)
     }
 
     m_guiBuilder->widgetSelected(widget ? widget->ptr : nullptr);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Form::drawLine(sf::RenderWindow& window, sf::Vector2f startPoint, sf::Vector2f endPoint) const
+{
+    sf::Vertex line[2] = {
+        {startPoint + sf::Vector2f{0.5f, 0.5f}, sf::Color{0, 0, 139}},
+        {endPoint + sf::Vector2f{0.5f, 0.5f}, sf::Color{0, 0, 139}}
+    };
+    window.draw(line, 2, sf::Lines);
 }

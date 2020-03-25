@@ -34,7 +34,7 @@ struct ComboBoxProperties : WidgetProperties
     // TODO: Item Ids
     // TODO: ListBox renderer
 
-    void updateProperty(tgui::Widget::Ptr widget, const std::string& property, const std::string& value) const override
+    void updateProperty(tgui::Widget::Ptr widget, const std::string& property, const sf::String& value) const override
     {
         auto comboBox = std::dynamic_pointer_cast<tgui::ComboBox>(widget);
         if (property == "Items")
@@ -45,15 +45,19 @@ struct ComboBoxProperties : WidgetProperties
                 comboBox->addItem(item);
         }
         else if (property == "SelectedItemIndex")
-            comboBox->setSelectedItemByIndex(static_cast<std::size_t>(tgui::stoi(value)));
+            comboBox->setSelectedItemByIndex(static_cast<std::size_t>(tgui::strToInt(value.toAnsiString())));
         else if (property == "ItemsToDisplay")
-            comboBox->setItemsToDisplay(static_cast<std::size_t>(tgui::stoi(value)));
+            comboBox->setItemsToDisplay(static_cast<std::size_t>(tgui::strToInt(value.toAnsiString())));
         else if (property == "TextSize")
-            comboBox->setTextSize(static_cast<unsigned int>(tgui::stoi(value)));
+            comboBox->setTextSize(static_cast<unsigned int>(tgui::strToInt(value.toAnsiString())));
+        else if (property == "DefaultText")
+            comboBox->setDefaultText(value);
         else if (property == "MaximumItems")
-            comboBox->setMaximumItems(static_cast<unsigned int>(tgui::stoi(value)));
+            comboBox->setMaximumItems(static_cast<unsigned int>(tgui::strToInt(value.toAnsiString())));
         else if (property == "ExpandDirection")
             comboBox->setExpandDirection(deserializeExpandDirection(value));
+        else if (property == "ChangeItemOnScroll")
+            comboBox->setChangeItemOnScroll(parseBoolean(value, false));
         else
             WidgetProperties::updateProperty(widget, property, value);
     }
@@ -68,12 +72,14 @@ struct ComboBoxProperties : WidgetProperties
         pair.first["TextSize"] = {"UInt", tgui::to_string(comboBox->getTextSize())};
         pair.first["MaximumItems"] = {"UInt", tgui::to_string(comboBox->getMaximumItems())};
         pair.first["ExpandDirection"] = {"Enum{Down, Up, Automatic}", serializeExpandDirection(comboBox->getExpandDirection())};
+        pair.first["ChangeItemOnScroll"] = {"Bool", tgui::Serializer::serialize(comboBox->getChangeItemOnScroll())};
 
         const auto renderer = comboBox->getSharedRenderer();
         pair.second["Borders"] = {"Outline", renderer->getBorders().toString()};
         pair.second["Padding"] = {"Outline", renderer->getPadding().toString()};
         pair.second["BackgroundColor"] = {"Color", tgui::Serializer::serialize(renderer->getBackgroundColor())};
         pair.second["TextColor"] = {"Color", tgui::Serializer::serialize(renderer->getTextColor())};
+        pair.second["DefaultTextColor"] = {"Color", tgui::Serializer::serialize(renderer->getDefaultTextColor())};
         pair.second["ArrowColor"] = {"Color", tgui::Serializer::serialize(renderer->getArrowColor())};
         pair.second["ArrowColorHover"] = {"Color", tgui::Serializer::serialize(renderer->getArrowColorHover())};
         pair.second["ArrowBackgroundColor"] = {"Color", tgui::Serializer::serialize(renderer->getArrowBackgroundColor())};
@@ -83,6 +89,7 @@ struct ComboBoxProperties : WidgetProperties
         pair.second["TextureArrow"] = {"Texture", tgui::Serializer::serialize(renderer->getTextureArrow())};
         pair.second["TextureArrowHover"] = {"Texture", tgui::Serializer::serialize(renderer->getTextureArrowHover())};
         pair.second["TextStyle"] = {"TextStyle", tgui::Serializer::serialize(renderer->getTextStyle())};
+        pair.second["DefaultTextStyle"] = {"TextStyle", tgui::Serializer::serialize(renderer->getDefaultTextStyle())};
         return pair;
     }
 

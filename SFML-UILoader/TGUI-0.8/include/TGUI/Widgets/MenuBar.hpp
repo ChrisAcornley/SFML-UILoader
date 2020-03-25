@@ -126,6 +126,8 @@ namespace tgui
         /// @param args     Optional extra arguments to pass to the signal handler when the signal is emitted
         ///
         /// @return Unique id of the connection
+        ///
+        /// The hierarchy does not need to exist yet and the signal will still exist when removing and readding the menu items.
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         template <typename Func, typename... Args>
         unsigned int connectMenuItem(const sf::String& menu, const sf::String& menuItem, Func&& handler, const Args&... args)
@@ -144,11 +146,13 @@ namespace tgui
         /// @param args      Optional extra arguments to pass to the signal handler when the signal is emitted
         ///
         /// @return Unique id of the connection
+        ///
+        /// The hierarchy does not need to exist yet and the signal will still exist when removing and readding the menu items.
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         template <typename Func, typename... Args>
         unsigned int connectMenuItem(const std::vector<sf::String>& hierarchy, Func&& handler, const Args&... args)
         {
-        #ifdef TGUI_USE_CPP17
+#if defined(__cpp_lib_invoke) && (__cpp_lib_invoke >= 201411L)
             return connect("MenuItemClicked",
                 [=](const std::vector<sf::String>& clickedMenuItem)
                 {
@@ -156,7 +160,7 @@ namespace tgui
                         std::invoke(handler, args...);
                 }
             );
-        #else
+#else
             return connect("MenuItemClicked",
                 [f=std::function<void(const Args&...)>(handler),args...,hierarchy](const std::vector<sf::String>& clickedMenuItem)
                 {
@@ -164,7 +168,7 @@ namespace tgui
                         f(args...);
                 }
             );
-        #endif
+#endif
         }
 
 
@@ -301,6 +305,31 @@ namespace tgui
 
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// @brief Removes all menu items from a menu
+        ///
+        /// @param menu      The name of the menu for which all menu items should be removed
+        ///
+        /// @return True when the menu existed and its children were removed, false when menu was not found
+        ///
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        bool removeMenuItems(const sf::String& menu);
+
+
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// @brief Removes a all menu items below a (sub) menu
+        ///
+        /// @param hierarchy Hierarchy of the menu item, starting with the menu and ending with the sub menu containing the items
+        ///
+        /// @return True when the menu item existed and its children were removed, false when hierarchy was incorrect
+        ///
+        /// @code
+        /// menuBar->removeSubMenuItems({"File", "Recent files"});
+        /// @endcode
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        bool removeSubMenuItems(const std::vector<sf::String>& hierarchy);
+
+
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// @brief Enable or disable an entire menu
         /// @param menu     The name of the menu to enable or disable
         /// @param enabled  Should the menu be enabled or disabled?
@@ -357,16 +386,7 @@ namespace tgui
         /// @brief Changes the character size of the text
         /// @param size  The new size of the text.
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        void setTextSize(unsigned int size);
-
-
-        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        /// @brief Returns the character size of the text
-        ///
-        /// @return The text size
-        ///
-        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        unsigned int getTextSize() const;
+        void setTextSize(unsigned int size) override;
 
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -470,7 +490,7 @@ namespace tgui
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// @internal
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        void mouseNoLongerDown() override;
+        void leftMouseButtonNoLongerDown() override;
 
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -615,8 +635,6 @@ namespace tgui
         std::vector<Menu> m_menus;
 
         int m_visibleMenu = -1;
-
-        unsigned int m_textSize = 0;
 
         float m_minimumSubMenuWidth = 125;
 

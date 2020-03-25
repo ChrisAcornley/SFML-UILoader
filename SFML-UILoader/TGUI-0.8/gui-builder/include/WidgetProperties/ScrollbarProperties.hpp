@@ -31,19 +31,21 @@
 
 struct ScrollbarProperties : WidgetProperties
 {
-    void updateProperty(tgui::Widget::Ptr widget, const std::string& property, const std::string& value) const override
+    void updateProperty(tgui::Widget::Ptr widget, const std::string& property, const sf::String& value) const override
     {
         auto scrollbar = std::dynamic_pointer_cast<tgui::Scrollbar>(widget);
         if (property == "Maximum")
-            scrollbar->setMaximum(static_cast<unsigned int>(tgui::stoi(value)));
+            scrollbar->setMaximum(static_cast<unsigned int>(tgui::strToInt(value.toAnsiString())));
         else if (property == "Value")
-            scrollbar->setValue(static_cast<unsigned int>(tgui::stoi(value)));
+            scrollbar->setValue(static_cast<unsigned int>(tgui::strToInt(value.toAnsiString())));
         else if (property == "ViewportSize")
-            scrollbar->setViewportSize(static_cast<unsigned int>(tgui::stoi(value)));
+            scrollbar->setViewportSize(static_cast<unsigned int>(tgui::strToInt(value.toAnsiString())));
         else if (property == "ScrollAmount")
-            scrollbar->setScrollAmount(static_cast<unsigned int>(tgui::stoi(value)));
+            scrollbar->setScrollAmount(static_cast<unsigned int>(tgui::strToInt(value.toAnsiString())));
         else if (property == "AutoHide")
             scrollbar->setAutoHide(parseBoolean(value, true));
+        else if (property == "VerticalScroll")
+            scrollbar->setVerticalScroll(parseBoolean(value, true));
         else
             WidgetProperties::updateProperty(widget, property, value);
     }
@@ -57,6 +59,7 @@ struct ScrollbarProperties : WidgetProperties
         pair.first["ViewportSize"] = {"UInt", tgui::to_string(scrollbar->getViewportSize())};
         pair.first["ScrollAmount"] = {"UInt", tgui::to_string(scrollbar->getScrollAmount())};
         pair.first["AutoHide"] = {"Bool", tgui::Serializer::serialize(scrollbar->getAutoHide())};
+        pair.first["VerticalScroll"] = {"Bool", tgui::to_string(scrollbar->getVerticalScroll())};
 
         const auto renderer = scrollbar->getSharedRenderer();
         pair.second["TrackColor"] = {"Color", tgui::Serializer::serialize(renderer->getTrackColor())};

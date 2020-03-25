@@ -165,16 +165,7 @@ namespace tgui
         /// @param size  The new text size
         ///
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        void setTextSize(unsigned int size);
-
-
-        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        /// @brief Returns the character size of the text
-        ///
-        /// @return The current text size
-        ///
-        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        unsigned int getTextSize() const;
+        void setTextSize(unsigned int size) override;
 
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -316,6 +307,13 @@ namespace tgui
         bool canGainFocus() const override;
 
 
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// @brief Returns whether the mouse position (which is relative to the parent widget) lies on top of the widget
+        /// @return Is the mouse on top of the widget?
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        bool mouseOnWidget(Vector2f pos) const override;
+
+
         /// @internal
         void leftMousePressed(Vector2f pos) override;
 
@@ -332,7 +330,7 @@ namespace tgui
         void mouseNoLongerOnWidget() override;
 
         /// @internal
-        void mouseNoLongerDown() override;
+        void leftMouseButtonNoLongerDown() override;
 
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -414,7 +412,6 @@ namespace tgui
         sf::String m_string;
         std::vector<Text> m_lines;
 
-        unsigned int m_textSize = 0;
         HorizontalAlignment m_horizontalAlignment = HorizontalAlignment::Left;
         VerticalAlignment m_verticalAlignment = VerticalAlignment::Top;
 
@@ -434,6 +431,8 @@ namespace tgui
         Scrollbar::Policy  m_scrollbarPolicy = Scrollbar::Policy::Never;
 #endif
 
+        Sprite    m_spriteBackground;
+
         // Cached renderer properties
         Borders   m_bordersCached;
         Padding   m_paddingCached;
@@ -441,6 +440,8 @@ namespace tgui
         Color     m_textColorCached;
         Color     m_borderColorCached;
         Color     m_backgroundColorCached;
+        Color     m_textOutlineColorCached;
+        float     m_textOutlineThicknessCached = 0;
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     };

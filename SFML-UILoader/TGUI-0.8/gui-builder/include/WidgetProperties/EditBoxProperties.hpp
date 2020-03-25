@@ -31,7 +31,7 @@
 
 struct EditBoxProperties : WidgetProperties
 {
-    void updateProperty(tgui::Widget::Ptr widget, const std::string& property, const std::string& value) const override
+    void updateProperty(tgui::Widget::Ptr widget, const std::string& property, const sf::String& value) const override
     {
         auto editBox = std::dynamic_pointer_cast<tgui::EditBox>(widget);
         if (property == "Text")
@@ -39,11 +39,11 @@ struct EditBoxProperties : WidgetProperties
         else if (property == "DefaultText")
             editBox->setDefaultText(value);
         else if (property == "TextSize")
-            editBox->setTextSize(static_cast<unsigned int>(tgui::stoi(value)));
+            editBox->setTextSize(static_cast<unsigned int>(tgui::strToInt(value.toAnsiString())));
         else if (property == "PasswordCharacter")
-            editBox->setPasswordCharacter(value.empty() ? '\0' : value[0]);
+            editBox->setPasswordCharacter(value.isEmpty() ? '\0' : static_cast<char>(value[0]));
         else if (property == "MaximumCharacters")
-            editBox->setMaximumCharacters(static_cast<unsigned int>(tgui::stoi(value)));
+            editBox->setMaximumCharacters(static_cast<unsigned int>(tgui::strToInt(value.toAnsiString())));
         else if (property == "Alignment")
             editBox->setAlignment(deserializeAlignment(value));
         else if (property == "LimitTextWidth")
@@ -70,7 +70,7 @@ struct EditBoxProperties : WidgetProperties
         pair.first["Alignment"] = {"Enum{Left,Center,Right}", serializeAlignment(editBox->getAlignment())};
         pair.first["LimitTextWidth"] = {"Bool", tgui::Serializer::serialize(editBox->isTextWidthLimited())};
         pair.first["ReadOnly"] = {"Bool", tgui::Serializer::serialize(editBox->isReadOnly())};
-        pair.first["InputValidator"] = {"String", editBox->getInputValidator()};
+        pair.first["InputValidator"] = {"EditBoxInputValidator", editBox->getInputValidator()};
         pair.first["Suffix"] = {"String", editBox->getSuffix()};
 
         const auto renderer = editBox->getSharedRenderer();

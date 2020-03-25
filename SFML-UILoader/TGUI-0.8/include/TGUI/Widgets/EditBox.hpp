@@ -71,17 +71,17 @@ namespace tgui
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         struct Validator
         {
-        #ifdef TGUI_USE_CPP17
+#if TGUI_COMPILED_WITH_CPP_VER >= 17
             static inline const std::string All   = ".*";                    ///< Accept any input
             static inline const std::string Int   = "[+-]?[0-9]*";           ///< Accept negative and positive integers
             static inline const std::string UInt  = "[0-9]*";                ///< Accept only positive integers
             static inline const std::string Float = "[+-]?[0-9]*\\.?[0-9]*"; ///< Accept decimal numbers
-        #else
+#else
             static TGUI_API const std::string All;   ///< Accept any input
             static TGUI_API const std::string Int;   ///< Accept negative and positive integers
             static TGUI_API const std::string UInt;  ///< Accept only positive integers
             static TGUI_API const std::string Float; ///< Accept decimal numbers
-        #endif
+#endif
         };
 
 
@@ -222,7 +222,7 @@ namespace tgui
         ///                  If the size is 0 then the text will be scaled to fit in the edit box.
         ///
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        void setTextSize(unsigned int textSize);
+        void setTextSize(unsigned int textSize) override;
 
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -231,7 +231,7 @@ namespace tgui
         /// @return The text size
         ///
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        unsigned int getTextSize() const;
+        unsigned int getTextSize() const override;
 
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -368,6 +368,8 @@ namespace tgui
         ///
         /// @param regex  Valid regular expression for std::regex to match on text changes
         ///
+        /// @return True when validator was changed, false when std::regex_error was thrown internally.
+        ///
         /// When the regex does not match when calling the setText function then the edit box contents will be cleared.
         /// When it does not match when the user types a character in the edit box, then the input character is rejected.
         ///
@@ -377,7 +379,7 @@ namespace tgui
         /// edit2->setInputValidator("[a-zA-Z][a-zA-Z0-9]*");
         /// @endcode
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        void setInputValidator(const std::string& regex = ".*");
+        bool setInputValidator(const std::string& regex = ".*");
 
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -581,9 +583,6 @@ namespace tgui
 
         std::string   m_regexString = ".*";
         std::regex    m_regex = std::regex{m_regexString};
-
-        // This will store the size of the text ( 0 to auto size )
-        unsigned int  m_textSize = 0;
 
         // The text alignment
         Alignment     m_textAlignment = Alignment::Left;

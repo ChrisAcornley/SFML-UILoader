@@ -250,6 +250,16 @@ namespace tgui
 
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// @brief Returns the item name of the item at the given index
+        ///
+        /// @param index  The index of the item to return
+        ///
+        /// @return The requested item, or an empty string when the index was too high
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        sf::String getItemByIndex(std::size_t index) const;
+
+
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// @brief Returns the currently selected item
         ///
         /// @return The selected item
@@ -384,16 +394,7 @@ namespace tgui
         /// @see setItemHeight
         ///
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        void setTextSize(unsigned int textSize);
-
-
-        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        /// @brief Returns the text size of the items
-        ///
-        /// @return The text size
-        ///
-        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        unsigned int getTextSize() const;
+        void setTextSize(unsigned int textSize) override;
 
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -457,6 +458,22 @@ namespace tgui
 
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// @brief Changes the thumb position of the scrollbar
+        ///
+        /// @param value  New value of the scrollbar
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        void setScrollbarValue(unsigned int value);
+
+
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// @brief Returns the thumb position of the scrollbar
+        ///
+        /// @return Value of the scrollbar
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        unsigned int getScrollbarValue() const;
+
+
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// @brief Returns whether the mouse position (which is relative to the parent widget) lies on top of the widget
         ///
         /// @return Is the mouse on top of the widget?
@@ -492,7 +509,7 @@ namespace tgui
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// @internal
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        void mouseNoLongerDown() override;
+        void leftMouseButtonNoLongerDown() override;
 
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -589,10 +606,10 @@ namespace tgui
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     public:
 
-        SignalItem onItemSelect   = {"ItemSelected"};   ///< An item was selected in the list box. Optional parameter: selected item
-        SignalItem onMousePress   = {"MousePressed"};   ///< The mouse went down on an item. Optional parameter: selected item
-        SignalItem onMouseRelease = {"MouseReleased"};  ///< The mouse was released on one of the items. Optional parameter: selected item
-        SignalItem onDoubleClick  = {"DoubleClicked"};  ///< An item was double clicked. Optional parameter: selected item
+        SignalItem onItemSelect   = {"ItemSelected"};   ///< An item was selected in the list box. Optional parameter: selected item or its index
+        SignalItem onMousePress   = {"MousePressed"};   ///< The mouse went down on an item. Optional parameter: selected item or its index
+        SignalItem onMouseRelease = {"MouseReleased"};  ///< The mouse was released on one of the items. Optional parameter: selected item or its index
+        SignalItem onDoubleClick  = {"DoubleClicked"};  ///< An item was double clicked. Optional parameter: selected item or its index
 
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -611,7 +628,6 @@ namespace tgui
         // The size must be stored
         unsigned int m_itemHeight = 0;
         unsigned int m_requestedTextSize = 0;
-        unsigned int m_textSize = 0;
 
         // This will store the maximum number of items in the list box (zero by default, meaning that there is no limit)
         std::size_t m_maxItems = 0;
