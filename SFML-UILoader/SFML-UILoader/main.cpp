@@ -5,6 +5,8 @@
 #include <rapidjson/document.h>
 #include <TGUI/TGUI.hpp>
 #include <iostream>
+#include <chrono>
+#include <thread>
 
 std::string userSelectFile()
 {
@@ -63,7 +65,7 @@ int main(int argc, char **argv)
 	std::string sourceFile;
 	std::string dstFile;
 
-	if (argc > 1) {
+	if (argc == 3) {
 		// first arg is location of source file
 		sourceFile = argv[1];
 
@@ -85,7 +87,7 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	if (!dstFile.empty())
+	/*if (!dstFile.empty())
 	{
 		if (window.isOpen())
 		{
@@ -100,25 +102,45 @@ int main(int argc, char **argv)
 		}
 	}
 	else
+	{*/
+	sf::Clock clock;
+	clock.restart();
+	sf::Int32 timeElasped = 0;
+
+	while (window.isOpen())
 	{
-		while (window.isOpen())
+		sf::Event event;
+		while (window.pollEvent(event))
 		{
-			sf::Event event;
-			while (window.pollEvent(event))
+			gui.handleEvent(event);
+			if (event.type == sf::Event::Closed)
 			{
-				gui.handleEvent(event);
-				if (event.type == sf::Event::Closed)
+				window.close();
+			}
+			if (event.type == sf::Event::KeyPressed)
+			{
+				if (event.key.code == sf::Keyboard::Return)
 				{
-					window.close();
+					TakeScreenshot(window, "output.png");
 				}
 			}
+		}
 
-			window.clear();
-			gui.draw();
-			window.display();
+		window.clear();
+		gui.draw();
+		window.display();
+
+		if (!dstFile.empty())
+		{
+			timeElasped += clock.getElapsedTime().asMilliseconds();
+			if (timeElasped > 100)
+			{
+				TakeScreenshot(window, dstFile);
+				return 0;
+			}
 		}
 	}
+	//}
 
 	gui.removeAllWidgets();
-	window.close();
 }
